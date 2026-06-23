@@ -3,7 +3,6 @@ import NavBar       from './components/chrome/NavBar'
 import BinaryRain   from './components/BinaryRain'
 
 import CodeIntroScene from './scenes/Page1/CodeIntroScene'
-import TunnelScene  from './scenes/Page1/TunnelScene'
 import CoreChipScene from './scenes/Page1/CoreChipScene'
 
 import CircuitScene from './scenes/Page2/CircuitScene'
@@ -26,11 +25,10 @@ export default function App() {
       <GlowCursor />
       <NavBar />
 
-      {/* ── Page 1: 코드 인트로 → 터널 → (분해→Rain→Core→Chip→회로큐) ──
-          (v5) HeroScene(소프트웨어학과 타이틀) 삭제 → 코드 인트로 직후 즉시 터널 진입.
-          진입 연출은 터널 자체 ENTRY 조립(ENTRY_END=0.18)이 담당. */}
+      {/* ── Page 1: 코드 인트로(노트북 화면 0/1 흡입) → (분해→Rain→Core→Chip→회로큐) ──
+          (v6) 별도 TunnelScene 제거 — 노트북 화면 속 0/1 터널이 직접 전체 화면을
+          덮으며 다음 씬으로 이어진다. */}
       <CodeIntroScene />
-      <TunnelScene />
       <CoreChipScene />
 
       {/* ── Page 2: 살아있는 PCB — 코어에서 과목 노드로 확장 ── */}

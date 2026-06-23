@@ -121,6 +121,94 @@ function ScreenSuckCanvas({ progressRef }) {
   return <canvas ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />
 }
 
+/* ── 전체 화면 0/1 터널: 노트북 화면에서 터져나와 화면 전체를 덮는다 ──
+   별도의 TunnelScene 없이, 이 캔버스가 그 역할을 대신한다. */
+function FullScreenSuckCanvas({ progressRef }) {
+  const canvasRef = useRef(null)
+  const wrapRef = useRef(null)
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+
+    const resize = () => {
+      canvas.width = canvas.offsetWidth || window.innerWidth
+      canvas.height = canvas.offsetHeight || window.innerHeight
+    }
+    resize()
+    const ro = new ResizeObserver(resize)
+    ro.observe(canvas)
+
+    const N = 260
+    const spawn = () => ({
+      angle: Math.random() * Math.PI * 2,
+      r: 10 + Math.random() * 40,
+      z: 0.1 + Math.random() * 0.9,
+      char: Math.random() > 0.5 ? '1' : '0',
+    })
+    const glyphs = Array.from({ length: N }, spawn)
+    let raf
+
+    function loop() {
+      const p = progressRef.current
+      const closeT = p > TYPE_END ? Math.max(0, Math.min(1, (p - TYPE_END) / (CLOSE_END - TYPE_END))) : 0
+      // 카메라가 빨려들어가는 구간(0.45~1.0)과 맞춰 화면 전체로 번져나간다
+      const burstT = Math.max(0, Math.min(1, (closeT - 0.45) / 0.55))
+      const eBurst = burstT * burstT * burstT // 후반부에 급격히 퍼진다
+
+      const W = canvas.width, H = canvas.height
+      const cx = W * 0.5, cy = H * 0.38
+
+      if (wrapRef.current) {
+        const radius = 5 + eBurst * 130 // % — 작은 원에서 화면 전체를 덮는 크기까지
+        wrapRef.current.style.clipPath = `circle(${radius}% at 50% 38%)`
+        wrapRef.current.style.opacity = String(Math.min(1, burstT * 2.2))
+      }
+
+      const velocity = (4 + burstT * 30) * (1 + eBurst * 1.5)
+
+      ctx.fillStyle = `rgba(2,6,4,${0.28})`
+      ctx.fillRect(0, 0, W, H)
+
+      for (const g of glyphs) {
+        g.z -= velocity * 0.0016
+        if (g.z <= 0.04) Object.assign(g, spawn(), { z: 1 })
+
+        const k = 1 / g.z
+        const x = cx + Math.cos(g.angle) * g.r * k
+        const y = cy + Math.sin(g.angle) * g.r * k * 0.7
+        if (x < -40 || x > W + 40 || y < -40 || y > H + 40) {
+          Object.assign(g, spawn(), { z: 1 })
+          continue
+        }
+
+        const depth = 1 - g.z
+        const alpha = Math.min(1, depth * 1.5)
+        if (alpha <= 0.02) continue
+
+        ctx.globalAlpha = alpha
+        ctx.fillStyle = depth > 0.7 ? '#aaffcc' : depth > 0.35 ? C.green : C.greenDim
+        const size = Math.min(60, 11 + k * 5)
+        ctx.font = `bold ${size}px 'JetBrains Mono', monospace`
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText(g.char, x, y)
+      }
+      ctx.globalAlpha = 1
+      raf = requestAnimationFrame(loop)
+    }
+    raf = requestAnimationFrame(loop)
+    return () => { cancelAnimationFrame(raf); ro.disconnect() }
+  }, [progressRef])
+
+  return (
+    <div ref={wrapRef} className="absolute inset-0 pointer-events-none" style={{ opacity: 0 }}>
+      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
+    </div>
+  )
+}
+
 function Laptop({ progressRef, typed, isComplete }) {
   const groupRef = useRef(null)
   const screenRef = useRef(null)
@@ -340,7 +428,6 @@ export default function CodeIntroScene() {
   const progressRef  = useRef(0)
   const animRef      = useRef(null)
   const [typedCount, setTypedCount] = useState(0)
-  const [suckFlash, setSuckFlash] = useState(0)
   const isComplete = typedCount >= WELCOME.length
   const typed = WELCOME.slice(0, typedCount)
 
@@ -360,18 +447,13 @@ export default function CodeIntroScene() {
     return () => ctx.revert()
   }, [])
 
-  // 스크롤 진행도(노트북 펼침 이후) → 타이핑 글자 수 + 빨려들어가는 플래시 강도
+  // 스크롤 진행도(노트북 펼침 이후) → 타이핑 글자 수
   useEffect(() => {
     function loop() {
       const p = progressRef.current
       const typeT = Math.max(0, Math.min(1, (p - OPEN_END) / (TYPE_END - OPEN_END)))
       const count = Math.round(typeT * WELCOME.length)
       setTypedCount((prev) => (prev === count ? prev : count))
-
-      const closeT = p > TYPE_END ? Math.max(0, Math.min(1, (p - TYPE_END) / (CLOSE_END - TYPE_END))) : 0
-      const suckT = Math.max(0, Math.min(1, (closeT - 0.45) / 0.55))
-      const flash = suckT * suckT
-      setSuckFlash((prev) => (Math.abs(prev - flash) < 0.005 ? prev : flash))
 
       animRef.current = requestAnimationFrame(loop)
     }
@@ -380,7 +462,7 @@ export default function CodeIntroScene() {
   }, [])
 
   return (
-    <section ref={containerRef} className="relative h-[380vh]">
+    <section ref={containerRef} className="relative h-[460vh]">
       <div className="sticky top-0 h-screen flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0 grid-bg" />
         <div
@@ -408,15 +490,8 @@ export default function CodeIntroScene() {
           </Canvas>
         </div>
 
-        {/* 빨려들어가는 구간의 초록 플래시 — 다음 씬(터널)의 색감으로 자연스럽게 이어준다 */}
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background: `radial-gradient(circle at 50% 38%, ${C.green} 0%, rgba(0,200,83,0.5) 30%, transparent 70%)`,
-            opacity: suckFlash,
-            mixBlendMode: 'screen',
-          }}
-        />
+        {/* 노트북 화면에서 터져나와 화면 전체를 덮는 0/1 터널 — 별도 TunnelScene 대체 */}
+        <FullScreenSuckCanvas progressRef={progressRef} />
 
         {!isComplete && (
           <motion.div
