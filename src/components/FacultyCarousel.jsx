@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { faculty } from '../data/faculty'
 import { C } from '../constants/colors'
+import PortraitPointCloud from './PortraitPointCloud'
 
 const EASE = 'cubic-bezier(.22,.85,.25,1)'
 const DUR = 460
@@ -103,19 +104,12 @@ export default function FacultyCarousel() {
             ‹
           </button>
 
-          <img
-            src={prof.img}
-            alt={prof.name}
+          <div
             className="select-none"
-            style={{
-              height: 'min(46vh, 420px)',
-              maxWidth: '64vw',
-              objectFit: 'contain',
-              WebkitMaskImage: 'radial-gradient(120% 120% at 50% 42%, #000 52%, transparent 88%)',
-              maskImage: 'radial-gradient(120% 120% at 50% 42%, #000 52%, transparent 88%)',
-              filter: `drop-shadow(0 0 50px ${C.greenGlow})`,
-            }}
-          />
+            style={{ height: 'min(46vh, 420px)', width: 'min(46vh, 420px)', maxWidth: '64vw' }}
+          >
+            <PortraitPointCloud src={prof.img} />
+          </div>
 
           <button
             onClick={next}
