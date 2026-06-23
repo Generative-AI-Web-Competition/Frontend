@@ -155,7 +155,8 @@ function FullScreenSuckCanvas({ progressRef }) {
     function loop() {
       const p = progressRef.current
       const closeT = p > TYPE_END ? Math.max(0, Math.min(1, (p - TYPE_END) / (CLOSE_END - TYPE_END))) : 0
-      const burstT = Math.max(0, Math.min(1, (closeT - 0.2) / 0.8))
+      // 0.55 지점에 이미 최고조에 달하고, 남은 스크롤(0.55~1.0) 동안 그 상태를 유지한다
+      const burstT = Math.max(0, Math.min(1, (closeT - 0.15) / 0.4))
       const eBurst = burstT * burstT // 갈수록 급격히 짙어지고 빨라진다
 
       const W = canvas.width, H = canvas.height
@@ -286,68 +287,87 @@ function Laptop({ progressRef, typed, isComplete }) {
         <meshBasicMaterial color={C.green} transparent opacity={0.07} depthWrite={false} />
       </mesh>
 
-      {/* keyboard deck */}
-      <RoundedBox args={[2.2, 0.12, 1.5]} radius={0.06} position={[0, -0.06, 0]}>
-        <meshStandardMaterial color="#3a4060" roughness={0.3} metalness={0.55} />
+      {/* keyboard deck — 더 슬림한 알루미늄 유니바디 톤(밝은 티타늄 실버) */}
+      <RoundedBox args={[2.2, 0.085, 1.5]} radius={0.05} smoothness={4} position={[0, -0.045, 0]}>
+        <meshStandardMaterial color="#868d9c" roughness={0.32} metalness={0.7} />
       </RoundedBox>
+      {/* 상판 가장자리 챔퍼 라인 — 음각 디테일 */}
+      <mesh position={[0, -0.0025, 0.745]}>
+        <boxGeometry args={[2.12, 0.004, 0.004]} />
+        <meshStandardMaterial color="#0c0d11" roughness={0.5} metalness={0.4} />
+      </mesh>
       {/* deck edge highlight — 윤곽이 배경과 분리되도록 */}
-      <mesh position={[0, -0.005, 0.76]}>
-        <boxGeometry args={[2.2, 0.01, 0.01]} />
-        <meshBasicMaterial color={C.green} transparent opacity={0.5} />
+      <mesh position={[0, -0.0025, 0.76]}>
+        <boxGeometry args={[2.2, 0.006, 0.006]} />
+        <meshBasicMaterial color={C.green} transparent opacity={0.45} />
       </mesh>
 
       {keyboardKeys.map((key, i) => (
-        <mesh key={i} geometry={keyGeo} position={[key.x, 0.008, key.z]}>
-          <meshStandardMaterial color="#454c78" roughness={0.4} metalness={0.15} />
-        </mesh>
+        <RoundedBox key={i} args={[0.13, 0.016, 0.1]} radius={0.018} smoothness={2} position={[key.x, 0.006, key.z]}>
+          <meshStandardMaterial color="#3c4049" roughness={0.5} metalness={0.25} />
+        </RoundedBox>
       ))}
 
-      {/* trackpad */}
-      <mesh position={[0, 0.007, 0.5]} rotation={[-Math.PI / 2, 0, 0]}>
+      {/* trackpad — 유리질 글로시 표면 */}
+      <mesh position={[0, 0.0055, 0.5]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[0.62, 0.42]} />
-        <meshStandardMaterial color="#454c78" roughness={0.6} metalness={0.05} />
+        <meshStandardMaterial color="#565b66" roughness={0.18} metalness={0.1} />
       </mesh>
 
       {/* screen / lid assembly */}
       <group ref={screenRef} position={[0, 0, -0.72]}>
-        {/* hinge */}
-        <mesh position={[0, 0.02, 0.02]} rotation={[0, 0, Math.PI / 2]}>
-          <cylinderGeometry args={[0.05, 0.05, 2.1, 16]} />
-          <meshStandardMaterial color="#2a2f50" roughness={0.4} metalness={0.6} />
+        {/* hinge — 더 가늘고 본체에 통합된 형태 */}
+        <mesh position={[0, 0.012, 0.02]} rotation={[0, 0, Math.PI / 2]}>
+          <cylinderGeometry args={[0.032, 0.032, 2.06, 20]} />
+          <meshStandardMaterial color="#5a5f6b" roughness={0.35} metalness={0.7} />
         </mesh>
 
-        {/* lid / bezel */}
-        <RoundedBox args={[2.2, 1.4, 0.08]} radius={0.06} position={[0, 0.68, 0.04]}>
-          <meshStandardMaterial color="#363c64" roughness={0.3} metalness={0.55} />
+        {/* lid / bezel — 더 슬림한 베젤 */}
+        <RoundedBox args={[2.18, 1.36, 0.055]} radius={0.05} smoothness={4} position={[0, 0.68, 0.03]}>
+          <meshStandardMaterial color="#868d9c" roughness={0.3} metalness={0.7} />
         </RoundedBox>
         {/* lid edge outline — 뒷면 실루엣을 또렷하게 */}
         <mesh position={[0, 0.68, 0.001]}>
-          <planeGeometry args={[2.24, 1.44]} />
-          <meshBasicMaterial color={C.green} transparent opacity={0.16} depthWrite={false} />
+          <planeGeometry args={[2.22, 1.4]} />
+          <meshBasicMaterial color={C.green} transparent opacity={0.14} depthWrite={false} />
+        </mesh>
+        {/* 로고 — 뒷면(바깥쪽) 중앙의 은은한 발광 링 */}
+        <mesh position={[0, 0.68, 0.0005]} rotation={[0, 0, Math.PI / 4]}>
+          <ringGeometry args={[0.045, 0.058, 32]} />
+          <meshStandardMaterial
+            color={C.green}
+            emissive={C.green}
+            emissiveIntensity={0.6}
+            roughness={0.3}
+            metalness={0.2}
+            transparent
+            opacity={0.85}
+            side={THREE.DoubleSide}
+          />
         </mesh>
 
         {/* webcam dot */}
-        <mesh position={[0, 1.3, 0.082]}>
-          <circleGeometry args={[0.018, 16]} />
-          <meshStandardMaterial color="#3a3f6b" roughness={0.2} emissive="#3a3f6b" emissiveIntensity={0.3} />
+        <mesh position={[0, 1.335, 0.063]}>
+          <circleGeometry args={[0.014, 16]} />
+          <meshStandardMaterial color="#2b2e38" roughness={0.2} emissive="#3a3f4a" emissiveIntensity={0.3} />
         </mesh>
 
         {/* screen panel */}
-        <mesh position={[0, 0.68, 0.085]}>
-          <planeGeometry args={[2.0, 1.2]} />
+        <mesh position={[0, 0.68, 0.0605]}>
+          <planeGeometry args={[2.04, 1.26]} />
           <meshStandardMaterial color="#081a10" emissive="#06270f" emissiveIntensity={0.4} roughness={0.55} />
         </mesh>
 
         {/* backlight glow */}
-        <mesh position={[0, 0.68, 0.086]}>
-          <planeGeometry args={[1.9, 1.1]} />
+        <mesh position={[0, 0.68, 0.063]}>
+          <planeGeometry args={[1.96, 1.18]} />
           <meshBasicMaterial color={C.green} transparent opacity={0.05} depthWrite={false} />
         </mesh>
 
         <pointLight ref={glowRef} position={[0, 0.68, 0.6]} color={C.green} intensity={0} distance={3} />
 
         {screenVisible && (
-          <Html position={[0, 0.68, 0.09]} center wrapperClass="pointer-events-none select-none">
+          <Html position={[0, 0.68, 0.066]} center wrapperClass="pointer-events-none select-none">
             <div className="relative" style={{ width: 567, height: 326 }}>
             <div
               ref={codeCardRef}
