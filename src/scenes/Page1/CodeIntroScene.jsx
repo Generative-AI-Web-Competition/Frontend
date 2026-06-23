@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
-import { Canvas, useFrame } from '@react-three/fiber'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { RoundedBox, Html } from '@react-three/drei'
 import * as THREE from 'three'
 import { motion } from 'framer-motion'
@@ -10,10 +10,10 @@ import { C } from '../../constants/colors'
 gsap.registerPlugin(ScrollTrigger)
 
 const WELCOME = 'WELCOME SKU SOFTWARE'
-const ENTER_END = 0.18 // 0→0.18 스크롤 진행도 동안 노트북이 멀리서 날아온다
-const OPEN_END  = 0.32 // 0.18→0.32 동안 펼쳐진다
-const TYPE_END  = 0.6  // 0.32→0.6 동안 화면에 타이핑
-const CLOSE_END = 1.0  // 0.6→1.0 동안 다시 닫힌다 (스크롤의 40% 할당 — 충분히 눈에 보이게)
+const ENTER_END = 0.28 // 0→0.28 스크롤 진행도 동안 노트북이 멀리서 날아온다 (느리게)
+const OPEN_END  = 0.46 // 0.28→0.46 동안 펼쳐진다
+const TYPE_END  = 0.66 // 0.46→0.66 동안 화면에 타이핑
+const CLOSE_END = 1.0  // 0.66→1.0 동안 닫히고, 화면 속으로 빨려들어간다
 
 const LAPTOP_SCALE = 1.7 // 최종 노트북 크기
 
@@ -82,21 +82,20 @@ function Laptop({ progressRef, typed, isComplete }) {
     if (!group || !screen) return
     const p = progressRef.current
 
-    // 진입: 멀리서(작게, 어둡게) 날아와 제자리에 안착
+    // 진입: 멀리서(작게, 어둡게) 날아와 제자리에 안착. 자리를 잡은 뒤로는
+    // 움직이지 않는다 — 마지막엔 카메라가 화면 속으로 빨려들어간다(랩탑이 아니라
+    // 시점이 다가가야 "빨려드는" 느낌이 난다).
     const enterT = Math.max(0, Math.min(1, p / ENTER_END))
     const eEnter = easeOutCubic(enterT)
 
-    // 퇴장: 닫히면서 다시 멀어지며 작아진다 (화면이 갑자기 커 보이는 것 방지)
-    const exitT = p > TYPE_END ? Math.max(0, Math.min(1, (p - TYPE_END) / (CLOSE_END - TYPE_END))) : 0
-    const eExit = exitT * exitT * exitT // easeIn — 서서히 멀어지다 가속
-
-    const z = (-9 + 9 * eEnter) - 7 * eExit
+    const z = -9 + 9 * eEnter
     const y = -1.7 + (-0.35 - -1.7) * eEnter
-    const scale = LAPTOP_SCALE * (0.4 + 0.6 * eEnter) * (1 - eExit * 0.5)
+    const scale = LAPTOP_SCALE * (0.4 + 0.6 * eEnter)
     group.position.set(0, y, z)
     group.scale.setScalar(scale)
 
-    // 펼침/닫힘: 진입 후 열리고, 타이핑이 끝나면 다시 닫힌다
+    // 펼침/닫힘: 진입 후 열리고, 타이핑이 끝나면 (닫힘 구간의 앞쪽 45%에서) 다시 닫힌다
+    const closeT = p > TYPE_END ? Math.max(0, Math.min(1, (p - TYPE_END) / (CLOSE_END - TYPE_END))) : 0
     let openT
     if (p < ENTER_END) {
       openT = 0
@@ -105,7 +104,7 @@ function Laptop({ progressRef, typed, isComplete }) {
     } else if (p < TYPE_END) {
       openT = 1
     } else {
-      openT = 1 - (p - TYPE_END) / (CLOSE_END - TYPE_END)
+      openT = 1 - Math.min(1, closeT / 0.45)
     }
     openT = Math.max(0, Math.min(1, openT))
     const openAngle = CLOSED_ANGLE + (OPEN_ANGLE - CLOSED_ANGLE) * easeOutCubic(openT)
@@ -116,7 +115,7 @@ function Laptop({ progressRef, typed, isComplete }) {
 
     // 화면 카드는 billboard라 뚜껑 회전을 따라가지 않으므로, 닫히기 시작하면
     // 뚜껑이 눈에 띄게 기울기 전에 먼저 사라지게 한다(어색한 분리 방지).
-    const closeFadeT = p > TYPE_END ? (p - TYPE_END) / ((CLOSE_END - TYPE_END) * 0.2) : 0
+    const closeFadeT = p > TYPE_END ? closeT / 0.2 : 0
     const visible = p < TYPE_END ? openness > 0.7 : closeFadeT < 1
     if (visible !== screenVisible) setScreenVisible(visible)
   })
@@ -192,16 +191,16 @@ function Laptop({ progressRef, typed, isComplete }) {
         {screenVisible && (
           <Html position={[0, 0.68, 0.09]} center wrapperClass="pointer-events-none select-none">
             <div
-              className="w-[567px] overflow-hidden rounded-lg font-mono text-base leading-relaxed"
+              className="w-[567px] overflow-hidden rounded-lg font-mono text-[15px] leading-snug"
               style={{ background: 'rgba(8,10,8,.97)', boxShadow: `inset 0 0 28px ${C.greenGlow}`, height: 326 }}
             >
-              <div className="flex items-center gap-2 px-4 py-2.5" style={{ borderBottom: `1px solid ${C.greenBorder}`, background: 'rgba(0,0,0,.3)' }}>
+              <div className="flex items-center gap-2 px-4 py-2" style={{ borderBottom: `1px solid ${C.greenBorder}`, background: 'rgba(0,0,0,.3)' }}>
                 <span className="h-2.5 w-2.5 rounded-full" style={{ background: '#ff5f57' }} />
                 <span className="h-2.5 w-2.5 rounded-full" style={{ background: '#febc2e' }} />
                 <span className="h-2.5 w-2.5 rounded-full" style={{ background: '#28c840' }} />
                 <span className="ml-1 opacity-60 text-sm tracking-wide">ExceptionApplication.java</span>
               </div>
-              <div className="p-5">
+              <div className="p-4">
                 {CODE_LINES.map((line, li) => (
                   <div key={li} style={{ paddingLeft: line.indent * 0.6 }}>
                     {line.tokens.map((tok, ti) => {
@@ -219,11 +218,11 @@ function Laptop({ progressRef, typed, isComplete }) {
                   </div>
                 ))}
                 <div
-                  className="mt-3 pt-3"
+                  className="mt-2 pt-2"
                   style={{ borderTop: `1px solid ${C.greenBorder}`, opacity: isComplete ? 1 : 0 }}
                 >
-                  <div style={{ color: C.greenDim, fontSize: 13 }}>$ java -jar ExceptionApplication.jar</div>
-                  <div style={{ color: C.green, fontSize: 18, textShadow: `0 0 10px ${C.greenGlow}` }}>{WELCOME}</div>
+                  <div style={{ color: C.greenDim, fontSize: 12 }}>$ java -jar ExceptionApplication.jar</div>
+                  <div style={{ color: C.green, fontSize: 16, textShadow: `0 0 10px ${C.greenGlow}` }}>{WELCOME}</div>
                 </div>
               </div>
             </div>
@@ -234,11 +233,34 @@ function Laptop({ progressRef, typed, isComplete }) {
   )
 }
 
+/* ── 카메라 리그: 닫힘 구간 후반부에 화면 속으로 빨려들어가듯 빠르게 다가간다 ── */
+function CameraRig({ progressRef }) {
+  const { camera } = useThree()
+
+  useFrame(() => {
+    const p = progressRef.current
+    const closeT = p > TYPE_END ? Math.max(0, Math.min(1, (p - TYPE_END) / (CLOSE_END - TYPE_END))) : 0
+    // 닫힘이 끝난 뒤(0.45~1.0)에만 빨려들어가는 가속 돌리인
+    const suckT = Math.max(0, Math.min(1, (closeT - 0.45) / 0.55))
+    const eSuck = suckT * suckT * suckT // easeIn — 점점 가속
+
+    // 노트북 본체(약 ±1.3 z범위) 안으로 카메라가 파고들지 않도록 2.4까지만 접근
+    camera.position.z = 7.2 - 4.8 * eSuck
+    camera.position.y = 2.7 - 2.45 * eSuck
+    camera.fov = 34 + 95 * eSuck
+    camera.updateProjectionMatrix()
+    camera.lookAt(0, -0.1 + 0.1 * eSuck, 0)
+  })
+
+  return null
+}
+
 export default function CodeIntroScene() {
   const containerRef = useRef(null)
   const progressRef  = useRef(0)
   const animRef      = useRef(null)
   const [typedCount, setTypedCount] = useState(0)
+  const [suckFlash, setSuckFlash] = useState(0)
   const isComplete = typedCount >= WELCOME.length
   const typed = WELCOME.slice(0, typedCount)
 
@@ -258,13 +280,19 @@ export default function CodeIntroScene() {
     return () => ctx.revert()
   }, [])
 
-  // 스크롤 진행도(노트북 펼침 이후) → 타이핑 글자 수
+  // 스크롤 진행도(노트북 펼침 이후) → 타이핑 글자 수 + 빨려들어가는 플래시 강도
   useEffect(() => {
     function loop() {
       const p = progressRef.current
       const typeT = Math.max(0, Math.min(1, (p - OPEN_END) / (TYPE_END - OPEN_END)))
       const count = Math.round(typeT * WELCOME.length)
       setTypedCount((prev) => (prev === count ? prev : count))
+
+      const closeT = p > TYPE_END ? Math.max(0, Math.min(1, (p - TYPE_END) / (CLOSE_END - TYPE_END))) : 0
+      const suckT = Math.max(0, Math.min(1, (closeT - 0.45) / 0.55))
+      const flash = suckT * suckT
+      setSuckFlash((prev) => (Math.abs(prev - flash) < 0.005 ? prev : flash))
+
       animRef.current = requestAnimationFrame(loop)
     }
     animRef.current = requestAnimationFrame(loop)
@@ -272,7 +300,7 @@ export default function CodeIntroScene() {
   }, [])
 
   return (
-    <section ref={containerRef} className="relative h-[280vh]">
+    <section ref={containerRef} className="relative h-[380vh]">
       <div className="sticky top-0 h-screen flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0 grid-bg" />
         <div
@@ -296,8 +324,19 @@ export default function CodeIntroScene() {
             <directionalLight position={[-5, 1, -3]} intensity={1.1} color={C.green} />
             <pointLight position={[0, 1.5, 3]} intensity={0.8} color={C.green} distance={10} />
             <Laptop progressRef={progressRef} typed={typed} isComplete={isComplete} />
+            <CameraRig progressRef={progressRef} />
           </Canvas>
         </div>
+
+        {/* 빨려들어가는 구간의 초록 플래시 — 다음 씬(터널)의 색감으로 자연스럽게 이어준다 */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: `radial-gradient(circle at 50% 38%, ${C.green} 0%, rgba(0,200,83,0.5) 30%, transparent 70%)`,
+            opacity: suckFlash,
+            mixBlendMode: 'screen',
+          }}
+        />
 
         {!isComplete && (
           <motion.div

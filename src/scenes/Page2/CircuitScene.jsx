@@ -1,5 +1,7 @@
 import { useRef } from 'react'
 import { motion, useScroll, useTransform } from 'framer-motion'
+import { Canvas, useFrame } from '@react-three/fiber'
+import { RoundedBox, Html } from '@react-three/drei'
 
 /* ════════════════════════════════════════════════════════
  *  CircuitScene  (v2 #3 — 살아있는 PCB)
@@ -61,6 +63,109 @@ const GROUND_VIAS = [
   [80, 80], [930, 80], [80, 660], [930, 660], [500, 60], [500, 680],
   [240, 250], [760, 250], [240, 470], [760, 470], [410, 660], [600, 60],
 ]
+
+/* ── 3D 칩 패키지: 평평한 SVG 대신 입체감 있는 QFP 칩 ── */
+function Chip3DModel({ progress }) {
+  const groupRef = useRef(null)
+  const dieGlowRef = useRef(null)
+  const dieLightRef = useRef(null)
+
+  const pins = []
+  for (let i = -3; i <= 3; i++) {
+    if (i === 0) continue
+    pins.push({ axis: 'x', pos: i * 0.18 })
+    pins.push({ axis: 'z', pos: i * 0.18 })
+  }
+
+  useFrame((_, delta) => {
+    const group = groupRef.current
+    if (!group) return
+    const power = Math.max(0, Math.min(1, progress.get()))
+    group.scale.setScalar(0.7 + power * 0.3)
+    group.rotation.y += delta * 0.25
+    group.rotation.x = Math.sin(performance.now() / 2200) * 0.12
+    if (dieGlowRef.current) dieGlowRef.current.material.opacity = power * 0.9
+    if (dieLightRef.current) dieLightRef.current.intensity = power * 1.2
+  })
+
+  return (
+    <group ref={groupRef} scale={0.7}>
+      {/* 패키지 본체 */}
+      <RoundedBox args={[1.5, 0.32, 1.5]} radius={0.07} smoothness={4}>
+        <meshStandardMaterial color="#0c2417" roughness={0.35} metalness={0.55} />
+      </RoundedBox>
+
+      {/* 핀 (4면) */}
+      {pins.map((p, i) => (
+        <mesh
+          key={i}
+          position={
+            p.axis === 'x'
+              ? [p.pos, -0.02, 0.78]
+              : [0.78 * (i % 2 === 0 ? 1 : -1), -0.02, p.pos]
+          }
+          rotation={p.axis === 'z' ? [0, Math.PI / 2, 0] : [0, 0, 0]}
+        >
+          <boxGeometry args={[0.07, 0.05, 0.22]} />
+          <meshStandardMaterial color={G_DEEP} roughness={0.4} metalness={0.7} />
+        </mesh>
+      ))}
+
+      {/* 다이(die) — 살짝 솟은 코어 + 발광 */}
+      <mesh position={[0, 0.18, 0]}>
+        <boxGeometry args={[0.82, 0.05, 0.82]} />
+        <meshStandardMaterial
+          color="#04150c"
+          emissive={G_NEAR}
+          emissiveIntensity={0.5}
+          roughness={0.4}
+          metalness={0.2}
+        />
+      </mesh>
+      <mesh ref={dieGlowRef} position={[0, 0.21, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[0.74, 0.74]} />
+        <meshBasicMaterial color={G_NEAR} transparent opacity={0} depthWrite={false} />
+      </mesh>
+      <pointLight ref={dieLightRef} position={[0, 0.6, 0]} color={G_NEAR} intensity={0} distance={2.4} />
+
+      {/* pin-1 마커 */}
+      <mesh position={[-0.62, 0.18, -0.62]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[0.04, 12]} />
+        <meshBasicMaterial color={G_NEAR} />
+      </mesh>
+
+      <Html position={[0, 0.21, 0]} center wrapperClass="pointer-events-none select-none">
+        <div className="text-center select-none">
+          <div
+            className="font-mono font-bold"
+            style={{ fontSize: 13, color: G_NEAR, letterSpacing: '0.04em', textShadow: `0 0 8px ${G_NEAR}` }}
+          >
+            SKU·SW
+          </div>
+          <div className="font-mono" style={{ fontSize: 8, color: 'rgba(0,200,83,0.75)', letterSpacing: '0.2em' }}>
+            CORE
+          </div>
+        </div>
+      </Html>
+    </group>
+  )
+}
+
+function Chip3D({ progress }) {
+  return (
+    <Canvas
+      camera={{ position: [1.6, 1.7, 1.9], fov: 32 }}
+      gl={{ alpha: true, antialias: true }}
+      style={{ background: 'transparent' }}
+      onCreated={({ camera }) => camera.lookAt(0, 0.1, 0)}
+    >
+      <ambientLight intensity={0.7} color="#dffce8" />
+      <directionalLight position={[3, 4, 3]} intensity={1.2} color="#fff8ed" />
+      <directionalLight position={[-3, 1, -2]} intensity={0.6} color={G_MID} />
+      <Chip3DModel progress={progress} />
+    </Canvas>
+  )
+}
 
 function CircuitBranch({ branch, progress }) {
   const { path, node, label, sub, start, end } = branch
@@ -230,38 +335,19 @@ export default function CircuitScene() {
                 </g>
               ))}
 
-              {/* package body */}
-              <motion.rect
-                x="425" y="285" width="150" height="150" rx="8"
-                fill="rgba(0,30,16,0.9)"
-                stroke={G_MID} strokeWidth="2"
-                style={{ filter: 'url(#chipGlowC)', opacity: chipPower }}
-              />
-              {/* die */}
-              <motion.rect
-                x="455" y="315" width="90" height="90" rx="3"
-                fill="rgba(0, 200, 83,0.04)" stroke="rgba(0,200,83,0.5)" strokeWidth="1"
-                style={{ opacity: chipPower }}
-              />
-              {/* pin-1 marker */}
-              <motion.circle cx="445" cy="305" r="3" fill={G_NEAR} style={{ opacity: chipPower }} />
-              {/* labels */}
-              <motion.text
-                x="500" y="356" textAnchor="middle" dominantBaseline="middle"
-                fill={G_NEAR} fontSize="15" fontWeight="700" fontFamily="'JetBrains Mono', monospace"
-                style={{ opacity: chipPower }}
-              >
-                SKU·SW
-              </motion.text>
-              <motion.text
-                x="500" y="376" textAnchor="middle" dominantBaseline="middle"
-                fill="rgba(0,200,83,0.6)" fontSize="9" fontFamily="'JetBrains Mono', monospace"
-                style={{ opacity: chipPower }}
-              >
-                CORE
-              </motion.text>
             </g>
           </svg>
+
+          {/* 3D 칩 패키지 — SVG viewBox(1000x720) 상의 425,285~575,435 칩 자리에 정렬 */}
+          <motion.div
+            className="absolute pointer-events-none"
+            style={{
+              left: '42.5%', top: '39.58%', width: '15%', height: '20.83%',
+              opacity: chipPower,
+            }}
+          >
+            <Chip3D progress={chipPower} />
+          </motion.div>
         </div>
 
         {/* center glow div behind chip */}
