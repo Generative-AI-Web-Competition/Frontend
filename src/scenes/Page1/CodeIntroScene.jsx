@@ -56,73 +56,10 @@ function easeOutCubic(t) {
 
 /* ── 3D 노트북: 멀리서 날아와 펼쳐지면 화면에 코드 인트로가 보인다 ── */
 /* ── 화면 속 0/1 터널: 코드 카드가 사라진 자리에서 점점 빠르게 빨려들어간다 ── */
-function ScreenSuckCanvas({ progressRef }) {
-  const canvasRef = useRef(null)
-
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    const W = 567, H = 326
-    canvas.width = W
-    canvas.height = H
-
-    const N = 160
-    const spawn = () => ({
-      angle: Math.random() * Math.PI * 2,
-      r: 6 + Math.random() * 14,
-      z: 0.15 + Math.random() * 0.85,
-      char: Math.random() > 0.5 ? '1' : '0',
-    })
-    const glyphs = Array.from({ length: N }, spawn)
-    let raf
-
-    function loop() {
-      const p = progressRef.current
-      const closeT = p > TYPE_END ? Math.max(0, Math.min(1, (p - TYPE_END) / (CLOSE_END - TYPE_END))) : 0
-      const speedT = Math.max(0, (closeT - 0.25) / 0.75)
-      const velocity = 0.003 + speedT * speedT * 0.045
-
-      ctx.fillStyle = 'rgba(3,8,5,0.32)'
-      ctx.fillRect(0, 0, W, H)
-
-      const cx = W / 2, cy = H / 2
-      for (const g of glyphs) {
-        g.z -= velocity
-        if (g.z <= 0.04) Object.assign(g, spawn(), { z: 1 })
-
-        const k = 1 / g.z
-        const x = cx + Math.cos(g.angle) * g.r * k
-        const y = cy + Math.sin(g.angle) * g.r * k * 0.62
-        if (x < -30 || x > W + 30 || y < -30 || y > H + 30) {
-          Object.assign(g, spawn(), { z: 1 })
-          continue
-        }
-
-        const depth = 1 - g.z
-        const alpha = Math.min(1, depth * 1.5)
-        if (alpha <= 0.02) continue
-
-        ctx.globalAlpha = alpha
-        ctx.fillStyle = depth > 0.7 ? '#aaffcc' : depth > 0.35 ? C.green : C.greenDim
-        const size = Math.min(30, 9 + k * 3)
-        ctx.font = `bold ${size}px 'JetBrains Mono', monospace`
-        ctx.textAlign = 'center'
-        ctx.textBaseline = 'middle'
-        ctx.fillText(g.char, x, y)
-      }
-      ctx.globalAlpha = 1
-      raf = requestAnimationFrame(loop)
-    }
-    raf = requestAnimationFrame(loop)
-    return () => cancelAnimationFrame(raf)
-  }, [progressRef])
-
-  return <canvas ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />
-}
-
 /* ── 전체 화면 0/1 터널: 노트북 화면에서 터져나와 화면 전체를 덮는다 ──
-   별도의 TunnelScene 없이, 이 캔버스가 그 역할을 대신한다. */
+   별도의 TunnelScene 없이, 이 캔버스가 그 역할을 대신한다. 화면 안/밖을 나누는
+   별도 캔버스 없이 이거 하나로 통일해 따로 노는 느낌을 없앤다. 'screen' 블렌드
+   모드를 써서 어두운 부분은 그대로 비치고 밝은 글자만 더해지므로 노트북이 가려지지 않는다. */
 function FullScreenSuckCanvas({ progressRef }) {
   const canvasRef = useRef(null)
   const wrapRef = useRef(null)
@@ -206,7 +143,11 @@ function FullScreenSuckCanvas({ progressRef }) {
   }, [progressRef])
 
   return (
-    <div ref={wrapRef} className="absolute inset-0 pointer-events-none" style={{ opacity: 0 }}>
+    <div
+      ref={wrapRef}
+      className="absolute inset-0 pointer-events-none"
+      style={{ opacity: 0, mixBlendMode: 'screen' }}
+    >
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
     </div>
   )
@@ -217,7 +158,6 @@ function Laptop({ progressRef, typed, isComplete }) {
   const screenRef = useRef(null)
   const glowRef = useRef(null)
   const codeCardRef = useRef(null)
-  const suckWrapRef = useRef(null)
   const [screenVisible, setScreenVisible] = useState(false)
 
   const keyboardKeys = useMemo(() => {
@@ -272,11 +212,10 @@ function Laptop({ progressRef, typed, isComplete }) {
     const visible = openness > 0.7
     if (visible !== screenVisible) setScreenVisible(visible)
 
-    // 화면 속 코드 카드 → 0/1 터널로 크로스페이드 (닫지 않고 화면 자체가 빨려들어가는 느낌)
+    // 화면 속 코드 카드는 닫지 않고 그대로 사라진다 — 화면 전체를 덮는 0/1 터널이 이어받는다
     const closeT = p > TYPE_END ? Math.max(0, Math.min(1, (p - TYPE_END) / (CLOSE_END - TYPE_END))) : 0
     const suckFadeT = Math.max(0, Math.min(1, closeT / 0.3))
     if (codeCardRef.current) codeCardRef.current.style.opacity = String(1 - suckFadeT)
-    if (suckWrapRef.current) suckWrapRef.current.style.opacity = String(suckFadeT)
   })
 
   return (
@@ -386,15 +325,6 @@ function Laptop({ progressRef, typed, isComplete }) {
                   <div style={{ color: C.green, fontSize: 16, textShadow: `0 0 10px ${C.greenGlow}` }}>{WELCOME}</div>
                 </div>
               </div>
-            </div>
-
-            {/* 코드 화면이 0/1 터널로 빨려들어가는 오버레이 — 노트북은 닫히지 않는다 */}
-            <div
-              ref={suckWrapRef}
-              className="absolute inset-0 overflow-hidden rounded-lg"
-              style={{ opacity: 0 }}
-            >
-              <ScreenSuckCanvas progressRef={progressRef} />
             </div>
             </div>
           </Html>
