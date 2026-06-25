@@ -8,6 +8,7 @@ import CircuitScene from './scenes/Page2/CircuitScene'
 import CurriculumRoadmap from './scenes/Page2/CurriculumRoadmap'
 
 import CurriculumOverview from './scenes/Page3/CurriculumOverview'
+import AwardsSection from './scenes/Page3/AwardsSection'
 import FutureScene  from './scenes/Page3/FutureScene'
 
 export default function App() {
@@ -35,8 +36,9 @@ export default function App() {
       {/* ── Page 2.5: 커리큘럼 로드맵 — 연도별 3D 터널 + 학년 테이블 (AI-contest-ver.chungs에서 이식) ── */}
       <CurriculumRoadmap />
 
-      {/* ── Page 3: 이수체계도 한눈에 보기 → 미래 ── */}
+      {/* ── Page 3: 이수체계도 한눈에 보기 → 수상 실적 → 미래(교수진) ── */}
       <CurriculumOverview />
+      <AwardsSection />
       <FutureScene />
     </main>
   )
