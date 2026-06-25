@@ -380,6 +380,7 @@ export default function CodeIntroScene() {
   const containerRef = useRef(null)
   const progressRef  = useRef(0)
   const animRef      = useRef(null)
+  const welcomeRef   = useRef(null)
   const [typedCount, setTypedCount] = useState(0)
   const isComplete = typedCount >= WELCOME.length
   const typed = WELCOME.slice(0, typedCount)
@@ -408,6 +409,18 @@ export default function CodeIntroScene() {
       const count = Math.round(typeT * WELCOME.length)
       setTypedCount((prev) => (prev === count ? prev : count))
 
+      // 환영 문구: 노트북이 멀리서 날아오는 것과 같은 박자로 작게 시작해 커지고,
+      // 닫혀 있는 동안 빈 공간에 떠 있다가, 화면이 열리며 노트북 실루엣이 그
+      // 자리를 그대로 덮으면(캔버스가 투명이라 가능) 자연히 가려진다.
+      const fadeIn  = Math.min(1, p / 0.05)
+      const fadeOut = 1 - Math.max(0, Math.min(1, (p - (OPEN_END - 0.05)) / 0.05))
+      const enterT  = Math.max(0, Math.min(1, p / ENTER_END))
+      const eEnter  = easeOutCubic(enterT)
+      if (welcomeRef.current) {
+        welcomeRef.current.style.opacity   = String(Math.max(0, Math.min(fadeIn, fadeOut)))
+        welcomeRef.current.style.transform = `scale(${0.5 + 0.5 * eEnter})`
+      }
+
       animRef.current = requestAnimationFrame(loop)
     }
     animRef.current = requestAnimationFrame(loop)
@@ -425,6 +438,28 @@ export default function CodeIntroScene() {
               'radial-gradient(ellipse 80% 60% at 50% 50%, transparent 30%, rgba(0,0,0,0.85) 100%)',
           }}
         />
+
+        {/* 환영 문구 — 노트북 위 빈 공간에 떠 있다가 화면이 열리며 그 실루엣에 가려진다.
+            Canvas가 투명 배경이라, DOM 순서상 이 아래(나중)에 그려지는 노트북이
+            겹치는 픽셀만큼 자연스럽게 이 문구를 덮어버린다. */}
+        <div
+          ref={welcomeRef}
+          className="absolute inset-x-0 top-[15vh] text-center px-6 pointer-events-none"
+          style={{ opacity: 0, transform: 'scale(0.5)' }}
+        >
+          <p
+            className="font-mono font-bold text-white"
+            style={{
+              fontSize: 'clamp(2rem,4.6vw,3.8rem)',
+              letterSpacing: '-0.02em',
+              textShadow: `0 0 24px ${C.greenGlow}`,
+              lineHeight: 1.5,
+              WebkitTextStroke: `0.6px ${C.green}`,
+            }}
+          >
+            서경대학교 소프트웨어학과에<br />오신 것을 환영합니다
+          </p>
+        </div>
 
         <div className="absolute inset-0">
           <Canvas
