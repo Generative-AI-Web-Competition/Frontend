@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { awards } from '../../data/awards'
 import { C } from '../../constants/colors'
+import AwardsGlowField from '../../components/AwardsGlowField'
 
 /* AI-contest-ver.chungs의 "수상 실적" 엔드크레딧을 demo 톤(그린/블랙)으로 다시
    그렸다. 처음엔 똑같은 모양의 카드를 한 줄로 쌓기만 해서 단조로웠다 — 가장
@@ -50,6 +51,24 @@ function TierPill({ tier }) {
   )
 }
 
+function handleGlare(e) {
+  const r = e.currentTarget.getBoundingClientRect()
+  e.currentTarget.style.setProperty('--mx', `${((e.clientX - r.left) / r.width) * 100}%`)
+  e.currentTarget.style.setProperty('--my', `${((e.clientY - r.top) / r.height) * 100}%`)
+}
+
+function Glare() {
+  return (
+    <div
+      className="absolute inset-0 pointer-events-none opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+      style={{
+        borderRadius: 'inherit',
+        background: 'radial-gradient(circle at var(--mx,50%) var(--my,50%), rgba(124,255,196,.16) 0%, transparent 55%)',
+      }}
+    />
+  )
+}
+
 function FeaturedAward({ award, index }) {
   const [flipped, setFlipped] = useState(false)
   const tier = getTier(award.title)
@@ -62,11 +81,12 @@ function FeaturedAward({ award, index }) {
       viewport={{ once: true, margin: '-10%' }}
       transition={{ duration: 0.6 }}
       onClick={() => setFlipped((f) => !f)}
+      onMouseMove={handleGlare}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setFlipped((f) => !f) }}
       aria-label={`${award.title} 자세히 보기`}
-      className="relative cursor-pointer select-none mb-6"
+      className="relative cursor-pointer select-none mb-6 group"
       style={{ minHeight: 220, perspective: 1200 }}
     >
       <div
@@ -100,6 +120,7 @@ function FeaturedAward({ award, index }) {
             <TierPill tier={tier} />
             <span className="font-mono text-[10px] opacity-35" style={{ color: C.green }}>⟲ 클릭해서 3D로 보기</span>
           </div>
+          <Glare />
         </div>
 
         {/* Back */}
@@ -139,11 +160,12 @@ function AwardCard({ award, index }) {
       viewport={{ once: true, margin: '-10%' }}
       transition={{ duration: 0.5, delay: Math.min(index, 6) * 0.06, ease: [0.16, 1, 0.3, 1] }}
       onClick={() => setFlipped((f) => !f)}
+      onMouseMove={handleGlare}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setFlipped((f) => !f) }}
       aria-label={`${award.title} 자세히 보기`}
-      className="relative cursor-pointer select-none"
+      className="relative cursor-pointer select-none group"
       style={{ minHeight: 200, perspective: 1000 }}
     >
       <div
@@ -184,6 +206,7 @@ function AwardCard({ award, index }) {
             </span>
             <TierPill tier={tier} />
           </div>
+          <Glare />
         </div>
 
         {/* Back face */}
@@ -222,6 +245,7 @@ export default function AwardsSection() {
 
   return (
     <section className="relative bg-black py-28 px-6 overflow-hidden">
+      <AwardsGlowField />
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
